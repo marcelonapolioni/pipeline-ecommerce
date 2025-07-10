@@ -9,15 +9,15 @@ steps:
     id: 'Push to Artifact Registry'
     args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}']
 
-  # 3. Faz o deploy do Cloud Run Job (Cria na 1ª vez, atualiza nas seguintes)
+  # 3. Faz o deploy do Cloud Run Job
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     id: 'Deploy Job'
     args:
-      - 'beta'  # <<< INFORMA QUE VAMOS USAR UM COMANDO BETA
+      - 'beta'
       - 'run'
       - 'jobs'
-      - 'deploy' # <<< COMANDO CORRETO AGORA
+      - 'deploy'
       - '${_SERVICE_NAME}-job'
       - '--image'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}'
@@ -26,7 +26,8 @@ steps:
       - '--service-account'
       - 'sa-cloud-build-pipeline@${PROJECT_ID}.iam.gserviceaccount.com'
       - '--set-env-vars'
-      - 'GCP_PROJECT_ID=${PROJECT_ID},BQ_DATASET_ID=${_BQ_DATASET_ID},BQ_TABLE_ID=${_BQ_TABLE_ID}'
+      # ATENÇÃO: A variável BQ_TABLE_ID foi removida
+      - 'GCP_PROJECT_ID=${PROJECT_ID},BQ_DATASET_ID=${_BQ_DATASET_ID}'
 
   # 4. Executa o Cloud Run Job
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
@@ -43,10 +44,10 @@ steps:
 
 substitutions:
   _REGION: 'us-central1'
-  _SERVICE_NAME: 'pipeline-paises'
+  _SERVICE_NAME: 'pipeline-ecommerce' # Nome atualizado para clareza
   _REPOSITORY: 'pipelines'
   _BQ_DATASET_ID: 'portfolio_dados'
-  _BQ_TABLE_ID: 'paises'
+  # A variável _BQ_TABLE_ID foi removida
 
 options:
   logging: CLOUD_LOGGING_ONLY

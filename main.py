@@ -1,4 +1,3 @@
-
 import os
 import requests
 import pandas as pd
@@ -11,62 +10,89 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-def run_pipeline():
-    """Função principal que orquestra a extração e o carregamento dos dados."""
+def fetch_and_load(url: str, table_name: str, project_id: str, dataset_id: str):
+    """
+    Função reutilizável para buscar dados de uma URL e carregar em uma tabela do BigQuery.
     
-    # --- Pega as configurações do ambiente ---
-    # É uma boa prática pegar configurações de variáveis de ambiente
-    project_id = os.getenv("GCP_PROJECT_ID")
-    dataset_id = os.getenv("BQ_DATASET_ID")
-    table_id = os.getenv("BQ_TABLE_ID")
-
-    if not all([project_id, dataset_id, table_id]):
-        logging.error("Variáveis de ambiente (GCP_PROJECT_ID, BQ_DATASET_ID, BQ_TABLE_ID) não foram configuradas.")
-        return
-
-    # --- ETAPA DE EXTRAÇÃO (Extract) ---
-    logging.info("Iniciando extração de dados da API REST Countries...")
+    Args:
+        url (str): A URL da API para buscar os dados.
+        table_name (str): O nome da tabela de destino no BigQuery.
+        project_id (str): O ID do projeto no Google Cloud.
+        dataset_id (str): O ID do conjunto de dados no BigQuery.
+    """
     try:
-        fields = "name,capital,population,area,region,subregion,cca3"
-        url = f"https://restcountries.com/v3.1/all?fields={fields}"
-        
+        logging.info(f"Iniciando extração de dados da API: {url}")
         response = requests.get(url)
         response.raise_for_status()  # Garante que a requisição foi um sucesso
-        dados = response.json()
-        logging.info("Dados extraídos com sucesso.")
+        data = response.json()
+        logging.info(f"Dados de '{table_name}' extraídos com sucesso.")
         
-        # Normaliza o JSON para um formato de tabela (achata a estrutura)
-        df = pd.json_normalize(dados, sep='_')
-        logging.info(f"Dados normalizados. DataFrame criado com {df.shape[0]} linhas.")
+        if not data:
+            logging.warning(f"Nenhum dado retornado da API para '{table_name}'. Pulando o carregamento.")
+            return
+
+        df = pd.DataFrame(data)
         
-    except requests.exceptions.RequestException as e:
-        logging.error(f"Erro ao extrair dados da API: {e}")
-        return
+        # --- ETAPA DE TRANSFORMAÇÃO BÁSICA (Pré-carregamento) ---
+        # Limpa nomes de colunas para serem compatíveis com o BigQuery
+        df.columns = df.columns.str.replace('[^0-9a-zA-Z_]', '_', regex=True).str.lower()
+        
+        # Converte colunas complexas (listas/dicionários) para string para carregar no BQ
+        # A transformação real será feita com SQL no BigQuery
+        for col in df.columns:
+            if df[col].apply(type).isin([list, dict]).any():
+                df[col] = df[col].astype(str)
+                
+        logging.info(f"Dados de '{table_name}' normalizados. DataFrame criado com {df.shape[0]} linhas.")
 
-    # --- ETAPA DE TRANSFORMAÇÃO BÁSICA (Transform) ---
-    # Limpa nomes de colunas para serem compatíveis com o BigQuery
-    df.columns = df.columns.str.replace('[^0-9a-zA-Z_]', '_', regex=True).str.lower()
-    
-    # Converte tipos de dados que podem ser problemáticos (listas/objetos para string)
-    for col in df.columns:
-        if df[col].apply(type).isin([list, dict]).any():
-            df[col] = df[col].astype(str)
-            
-    logging.info("Nomes de colunas limpos e tipos de dados ajustados.")
-
-    # --- ETAPA DE CARREGAMENTO (Load) ---
-    tabela_destino = f"{dataset_id}.{table_id}"
-    logging.info(f"Iniciando carregamento para a tabela do BigQuery: {tabela_destino}")
-    try:
+        # --- ETAPA DE CARREGAMENTO (Load) ---
+        destination_table = f"{dataset_id}.{table_name}"
+        logging.info(f"Iniciando carregamento para a tabela do BigQuery: {destination_table}")
+        
         to_gbq(
             df,
-            destination_table=tabela_destino,
+            destination_table=destination_table,
             project_id=project_id,
             if_exists='replace'  # Substitui a tabela a cada execução
         )
-        logging.info("Dados carregados com sucesso no BigQuery!")
+        logging.info(f"Dados de '{table_name}' carregados com sucesso no BigQuery!")
+
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Erro de rede ao extrair dados para '{table_name}': {e}")
     except Exception as e:
-        logging.error(f"Falha ao carregar dados no BigQuery: {e}")
+        logging.error(f"Falha no processamento de '{table_name}': {e}")
+
+
+def run_pipeline():
+    """Função principal que orquestra a extração e o carregamento dos dados de e-commerce."""
+    
+    # --- Pega as configurações do ambiente ---
+    project_id = os.getenv("GCP_PROJECT_ID")
+    dataset_id = os.getenv("BQ_DATASET_ID")
+
+    if not all([project_id, dataset_id]):
+        logging.error("Variáveis de ambiente (GCP_PROJECT_ID, BQ_DATASET_ID) não foram configuradas.")
+        return
+
+    logging.info("--- Iniciando pipeline de dados da Fake Store API ---")
+    
+    # Extrai e carrega os dados de produtos
+    fetch_and_load(
+        url="https://fakestoreapi.com/products",
+        table_name="raw_products",
+        project_id=project_id,
+        dataset_id=dataset_id
+    )
+    
+    # Extrai e carrega os dados de carrinhos (vendas)
+    fetch_and_load(
+        url="https://fakestoreapi.com/carts",
+        table_name="raw_carts",
+        project_id=project_id,
+        dataset_id=dataset_id
+    )
+    
+    logging.info("--- Pipeline de dados da Fake Store API finalizado. ---")
 
 
 if __name__ == "__main__":
