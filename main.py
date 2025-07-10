@@ -18,7 +18,7 @@ def fetch_and_load(url: str, table_name: str, project_id: str, dataset_id: str):
         url (str): A URL da API para buscar os dados.
         table_name (str): O nome da tabela de destino no BigQuery.
         project_id (str): O ID do projeto no Google Cloud.
-        dataset_id (str): O ID do conjunto de dados no BigQuery.
+        dataset_id (str): O ID do conjunto de dados no BigQuery
     """
     try:
         logging.info(f"Iniciando extração de dados da API: {url}")
