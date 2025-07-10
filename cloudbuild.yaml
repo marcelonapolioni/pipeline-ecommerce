@@ -1,37 +1,28 @@
 steps:
-  # 1. Constrói a imagem Docker
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}', '.']
-    id: 'Build Docker Image'
 
-  # 2. Envia a imagem construída para o Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}']
-    id: 'Push to Artifact Registry'
 
-  # 3. Faz o deploy da nova imagem no Cloud Run
+  # Executa a tarefa como um Cloud Run Job
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
       - 'run'
-      - 'deploy'
-      - '${_SERVICE_NAME}' # Nome do serviço no Cloud Run
+      - 'jobs'
+      - 'execute'
+      - '${_SERVICE_NAME}-job' # É uma boa prática nomear como um job
       - '--image'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}'
       - '--region'
       - '${_REGION}'
-      - '--platform'
-      - 'managed'
-      - '--update-env-vars' # Passa as variáveis de ambiente para o script Python
+      - '--set-env-vars' # O comando para variáveis de ambiente muda um pouco
       - 'GCP_PROJECT_ID=${PROJECT_ID},BQ_DATASET_ID=${_BQ_DATASET_ID},BQ_TABLE_ID=${_BQ_TABLE_ID}'
-      - '--quiet'
-    id: 'Deploy to Cloud Run'
+      - '--wait' # Espera o job terminar antes de finalizar o passo
+      - '--service-account' # Especifica a conta de serviço para o job
+      - 'sa-cloud-build-pipeline@${PROJECT_ID}.iam.gserviceaccount.com'
 
-# Define as variáveis de substituição que você configurará no Trigger
 substitutions:
-  _REGION: 'us-central1' # Mude para sua região
+  _REGION: 'us-central1'
   _SERVICE_NAME: 'pipeline-paises'
-  _REPOSITORY: 'pipelines' # Nome do seu repositório no Artifact Registry
+  _REPOSITORY: 'pipelines'
   _BQ_DATASET_ID: 'portfolio_dados'
   _BQ_TABLE_ID: 'paises'
 
