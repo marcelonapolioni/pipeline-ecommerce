@@ -24,7 +24,7 @@ steps:
       - 'managed'
       - '--update-env-vars' # Passa as variáveis de ambiente para o script Python
       - 'GCP_PROJECT_ID=${PROJECT_ID},BQ_DATASET_ID=${_BQ_DATASET_ID},BQ_TABLE_ID=${_BQ_TABLE_ID}'
-      - '--quiet' # Evita prompts interativos
+      - '--quiet'
     id: 'Deploy to Cloud Run'
 
 # Define as variáveis de substituição que você configurará no Trigger
@@ -34,3 +34,6 @@ substitutions:
   _REPOSITORY: 'pipelines' # Nome do seu repositório no Artifact Registry
   _BQ_DATASET_ID: 'portfolio_dados'
   _BQ_TABLE_ID: 'paises'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
