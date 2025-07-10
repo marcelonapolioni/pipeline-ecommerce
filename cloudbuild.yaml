@@ -1,22 +1,23 @@
 steps:
-  #  Constrói a imagem Docker
+  # 1. Constrói a imagem Docker
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['build', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}', '.']
     id: 'Build Docker Image'
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}', '.']
 
-  #  Envia a imagem construída para o Artifact Registry
+  # 2. Envia a imagem construída para o Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
-    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}']
     id: 'Push to Artifact Registry'
+    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}']
 
-  # Atualiza o Cloud Run Job com a nova imagem e configurações
+  # 3. Faz o deploy do Cloud Run Job (Cria na 1ª vez, atualiza nas seguintes)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
-    id: 'Update Job'
+    id: 'Deploy Job'
     args:
+      - 'beta'  # <<< INFORMA QUE VAMOS USAR UM COMANDO BETA
       - 'run'
       - 'jobs'
-      - 'update'
+      - 'deploy' # <<< COMANDO CORRETO AGORA
       - '${_SERVICE_NAME}-job'
       - '--image'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}'
@@ -27,7 +28,7 @@ steps:
       - '--set-env-vars'
       - 'GCP_PROJECT_ID=${PROJECT_ID},BQ_DATASET_ID=${_BQ_DATASET_ID},BQ_TABLE_ID=${_BQ_TABLE_ID}'
 
-  # Executa o Cloud Run Job recém-atualizado
+  # 4. Executa o Cloud Run Job
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     id: 'Execute Job'
@@ -38,7 +39,7 @@ steps:
       - '${_SERVICE_NAME}-job'
       - '--region'
       - '${_REGION}'
-      - '--wait' # Espera o job terminar
+      - '--wait'
 
 substitutions:
   _REGION: 'us-central1'
