@@ -1,23 +1,44 @@
 steps:
+  #  Constrói a imagem Docker
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}', '.']
+    id: 'Build Docker Image'
 
+  #  Envia a imagem construída para o Artifact Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}']
+    id: 'Push to Artifact Registry'
 
-  # Executa a tarefa como um Cloud Run Job
+  # Atualiza o Cloud Run Job com a nova imagem e configurações
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
+    id: 'Update Job'
     args:
       - 'run'
       - 'jobs'
-      - 'execute'
-      - '${_SERVICE_NAME}-job' # É uma boa prática nomear como um job
+      - 'update'
+      - '${_SERVICE_NAME}-job'
       - '--image'
       - '${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE_NAME}:${SHORT_SHA}'
       - '--region'
       - '${_REGION}'
-      - '--set-env-vars' # O comando para variáveis de ambiente muda um pouco
-      - 'GCP_PROJECT_ID=${PROJECT_ID},BQ_DATASET_ID=${_BQ_DATASET_ID},BQ_TABLE_ID=${_BQ_TABLE_ID}'
-      - '--wait' # Espera o job terminar antes de finalizar o passo
-      - '--service-account' # Especifica a conta de serviço para o job
+      - '--service-account'
       - 'sa-cloud-build-pipeline@${PROJECT_ID}.iam.gserviceaccount.com'
+      - '--set-env-vars'
+      - 'GCP_PROJECT_ID=${PROJECT_ID},BQ_DATASET_ID=${_BQ_DATASET_ID},BQ_TABLE_ID=${_BQ_TABLE_ID}'
+
+  # Executa o Cloud Run Job recém-atualizado
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    id: 'Execute Job'
+    args:
+      - 'run'
+      - 'jobs'
+      - 'execute'
+      - '${_SERVICE_NAME}-job'
+      - '--region'
+      - '${_REGION}'
+      - '--wait' # Espera o job terminar
 
 substitutions:
   _REGION: 'us-central1'
