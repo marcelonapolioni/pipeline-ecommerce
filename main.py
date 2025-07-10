@@ -27,7 +27,9 @@ def run_pipeline():
     # --- ETAPA DE EXTRAÇÃO (Extract) ---
     logging.info("Iniciando extração de dados da API REST Countries...")
     try:
-        url = "https://restcountries.com/v3.1/all"
+        fields = "name,capital,population,area,region,subregion,cca3"
+        url = f"https://restcountries.com/v3.1/all?fields={fields}"
+        
         response = requests.get(url)
         response.raise_for_status()  # Garante que a requisição foi um sucesso
         dados = response.json()
